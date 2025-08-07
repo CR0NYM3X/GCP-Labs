@@ -36,10 +36,9 @@ Este laboratorio está diseñado para:
 | **pgAudit** | Extensión de PostgreSQL que proporciona capacidades avanzadas de auditoría a nivel de sentencia SQL. |
 | **Autenticación IAM** | Permite que usuarios autenticados mediante IAM accedan a la base de datos sin necesidad de contraseñas tradicionales. |
 
----
  
 
-## 🧠 Análisis estructurado del laboratorio
+## 🧠 Task 1. Crear un Cloud SQL for PostgreSQL  con CMEK 
 
 
 
@@ -193,7 +192,7 @@ Al terminar este laboratorio:
 
 ---
 
-## 🧠 Habilitación y configuración de pgAudit en Cloud SQL para PostgreSQL
+## 🧠 Task 2. Habilitación y configuración de pgAudit en Cloud SQL para PostgreSQL
 
 
 
@@ -418,4 +417,199 @@ Al completar esta tarea, tendrás:
 - Registro detallado de operaciones SQL en Cloud Logging.
 - Capacidad para cumplir con requisitos de trazabilidad y seguridad.
 
----
+
+--- 
+
+## 🧠 Task 3. Autenticación IAM en Cloud SQL para PostgreSQL
+
+
+
+### 🔹 ¿Qué es Cloud SQL IAM Authentication?
+
+Es una funcionalidad que permite a los usuarios autenticarse en instancias de **Cloud SQL para PostgreSQL** usando **cuentas de IAM** en lugar de usuarios nativos de la base de datos. Esto se logra mediante **tokens OAuth 2.0** que actúan como contraseñas temporales.
+
+🔐 **Ventajas clave:**
+
+- Centralización de identidades
+- Tokens seguros y de corta duración
+- Integración con políticas IAM
+- Auditoría y trazabilidad
+
+
+
+### 🔸 Objetivo de esta tarea
+
+Configurar una instancia de Cloud SQL para:
+
+1. Probar acceso fallido con IAM antes de habilitarlo
+2. Habilitar autenticación IAM en la instancia
+3. Crear un usuario IAM en Cloud SQL
+4. Conceder permisos sobre una tabla específica
+5. Probar acceso exitoso con IAM
+6. Validar permisos granulares
+
+
+
+## 🧩 Desglose paso a paso del laboratorio
+
+
+
+### 🟦 1. Intento de conexión fallido con usuario IAM
+
+```bash
+export USERNAME=$(gcloud config list --format="value(core.account)")
+export CLOUDSQL_INSTANCE=postgres-orders
+export POSTGRESQL_IP=$(gcloud sql instances describe $CLOUDSQL_INSTANCE --format="value(ipAddresses[0].ipAddress)")
+export PGPASSWORD=$(gcloud auth print-access-token)
+psql --host=$POSTGRESQL_IP $USERNAME --dbname=orders
+```
+
+🔍 **¿Qué hace?**
+
+- Intenta conectarse a la base de datos usando el correo del usuario IAM como nombre de usuario.
+- Usa un token OAuth como contraseña.
+- Falla porque la autenticación IAM aún no está habilitada.
+
+📌 **Resultado esperado:**
+```
+psql: error: connection to server at "35.226.251.234", port 5432 failed: FATAL:  password authentication failed for user "student-01-22fa974575e4@qwiklabs.net"
+```
+
+
+
+### 🟦 2. Habilitar autenticación IAM en la instancia
+
+```bash
+gcloud sql instances patch $CLOUDSQL_INSTANCE \
+  --database-flags cloudsql.iam_authentication=on
+```
+
+🔍 **¿Qué hace?**
+
+- Activa el flag `cloudsql.iam_authentication` en la instancia.
+- Permite que Cloud SQL reconozca usuarios IAM como válidos para autenticación.
+
+📌 **Importante**: Requiere reiniciar la instancia para aplicar los cambios.
+
+
+
+
+### 🟦 3. Crear usuario IAM en Cloud SQL
+
+📍 Ruta:  
+`Cloud Console → SQL → postgres-orders → Users → Add user account → Cloud IAM`
+
+🔍 **¿Qué hace?**
+
+- Agrega el usuario IAM como usuario válido en Cloud SQL.
+- No crea una cuenta en PostgreSQL, sino que registra el principal IAM.
+
+📌 **Resultado esperado**:  
+El usuario aparece en la lista como tipo **IAM** y el flag `cloudsql.iam_authentication` se muestra en la configuración.
+
+
+
+
+
+### 🟦 4. Conceder permisos sobre tabla específica
+
+📍 Ruta:  
+`Cloud Console → SQL → postgres-orders → Connect to this instance → Open Cloud Shell`
+
+🔍 **Comandos SQL:**
+
+```sql
+\c orders
+GRANT ALL PRIVILEGES ON TABLE order_items TO "student-01-xxxx@qwiklabs.net";
+```
+
+🔍 **¿Qué hace?**
+
+- Conecta a la base de datos `orders` como administrador (`postgres`).
+- Concede permisos completos sobre la tabla `order_items` al usuario IAM.
+
+📌 **Nota**: El nombre debe coincidir exactamente con el principal IAM.
+
+
+
+
+### 🟦 5. Intento de conexión exitoso con usuario IAM
+
+```bash
+export PGPASSWORD=$(gcloud auth print-access-token)
+psql --host=$POSTGRESQL_IP $USERNAME --dbname=orders
+```
+
+🔍 **¿Qué hace?**
+
+- Usa el token OAuth como contraseña.
+- Conecta exitosamente a la base de datos usando el usuario IAM.
+
+📌 **Resultado esperado**:  
+Conexión establecida y acceso a la tabla `order_items`.
+
+
+
+
+### 🟦 6. Validar permisos granulares
+
+```sql
+SELECT COUNT(*) FROM order_items;
+-- Resultado: 198553
+
+SELECT COUNT(*) FROM users;
+-- Resultado: ERROR: permission denied for table users
+```
+
+🔍 **¿Qué hace?**
+
+- Verifica que el usuario IAM puede acceder solo a la tabla autorizada.
+- Confirma que no tiene acceso a otras tablas como `users`.
+
+📌 **Esto demuestra** que los permisos se aplican de forma precisa y segura.
+
+
+
+
+## 🗺️ Visualización del flujo de autenticación
+
+```mermaid
+sequenceDiagram
+    participant Usuario IAM
+    participant Cloud Shell
+    participant IAM
+    participant Cloud SQL
+    participant PostgreSQL
+
+    Usuario IAM->>Cloud Shell: Ejecuta psql con token
+    Cloud Shell->>IAM: Solicita token OAuth
+    IAM-->>Cloud Shell: Devuelve token
+    Cloud Shell->>Cloud SQL: Conecta con token
+    Cloud SQL->>PostgreSQL: Verifica usuario IAM
+    PostgreSQL-->>Cloud SQL: Permite acceso si tiene permisos
+    Cloud SQL-->>Usuario IAM: Conexión exitosa
+```
+
+
+
+## ✅ Resultado final
+
+Al completar esta tarea, tendrás:
+
+- Autenticación IAM habilitada en Cloud SQL
+- Usuario IAM registrado como usuario de base de datos
+- Permisos granulares sobre tablas específicas
+- Acceso seguro mediante tokens OAuth
+- Auditoría posible si se combina con `pgAudit`
+
+
+
+## 🛡️ Buenas prácticas y recomendaciones
+
+| Práctica | Recomendación |
+|----------|---------------|
+| 🔐 Tokens | Regenerar el token antes de cada conexión (`gcloud auth print-access-token`) |
+| 📜 Permisos | Usar `GRANT` por tabla, no globales |
+| 🔍 Auditoría | Combinar con `pgAudit` para trazabilidad |
+| 🧑‍🤝‍🧑 IAM | Usar grupos IAM para facilitar gestión |
+| ⚙️ Automatización | Usar cuentas de servicio para apps |
