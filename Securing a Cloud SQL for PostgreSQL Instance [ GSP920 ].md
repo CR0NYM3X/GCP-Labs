@@ -36,14 +36,22 @@ Este laboratorio está diseñado para:
 | **pgAudit** | Extensión de PostgreSQL que proporciona capacidades avanzadas de auditoría a nivel de sentencia SQL. |
 | **Autenticación IAM** | Permite que usuarios autenticados mediante IAM accedan a la base de datos sin necesidad de contraseñas tradicionales. |
 
- 
+
+--- 
+
+### Requisito 
+configura el id proyect en Cloud Shell
+
+```bash
+gcloud config set project qwiklabs-gcp-04-c9b59ff4042f
+```
 
 ## 🧠 Task 1. Crear un Cloud SQL for PostgreSQL  con CMEK 
 
 
 
 ### 🔹 1. **Creación de la identidad de servicio para Cloud SQL**
-
+- Ejecutar en Cloud Shell
 ```bash
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 gcloud beta services identity create \
@@ -65,7 +73,7 @@ gcloud beta services identity create \
 
 
 ### 🔹 2. **Creación del KeyRing y la clave en Cloud KMS**
-
+- Ejecutar en Cloud Shell
 ```bash
 export KMS_KEYRING_ID=cloud-sql-keyring
 export ZONE=$(gcloud compute instances list --filter="NAME=bastion-vm" --format=json | jq -r .[].zone | awk -F "/zones/" '{print $NF}')
@@ -92,7 +100,7 @@ gcloud kms keys create $KMS_KEY_ID \
 
 
 ### 🔹 3. **Asignación de permisos a la cuenta de Cloud SQL sobre la clave**
-
+- Ejecutar en Cloud Shell
 ```bash
 export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} \
     --format 'value(projectNumber)')
@@ -114,7 +122,7 @@ gcloud kms keys add-iam-policy-binding $KMS_KEY_ID \
 
 
 ### 🔹 4. **Obtención de IPs autorizadas**
-
+- Ejecutar en Cloud Shell
 ```bash
 	#  external IP address of the bastion-vm VM
 export AUTHORIZED_IP=$(gcloud compute instances describe bastion-vm \
@@ -138,7 +146,7 @@ echo Cloud Shell IP: $CLOUD_SHELL_IP
 
 
 ### 🔹 5. **Creación de la instancia de Cloud SQL PostgreSQL con CMEK**
-
+- Ejecutar en Cloud Shell
 ```bash
 export KEY_NAME=$(gcloud kms keys describe $KMS_KEY_ID \
     --keyring=$KMS_KEYRING_ID --location=$REGION \
@@ -227,7 +235,7 @@ Configurar una instancia de **Cloud SQL para PostgreSQL** para:
 
 
 ### 🟦 1. Habilitar flags de pgAudit en la instancia
-
+- Ejecutar en Cloud Shell
 ```bash
 gcloud sql instances patch $CLOUDSQL_INSTANCE \
     --database-flags cloudsql.enable_pgaudit=on,pgaudit.log=all
@@ -253,16 +261,19 @@ gcloud sql instances patch $CLOUDSQL_INSTANCE \
 
 ### 🟦 3. Conectarse a la instancia desde Cloud Shell
 
-  Path: Connect to this instance -> Open Cloud Shell.
+ Path:  Navigation menu -> SQL -> Click Instance named "postgres-orders" ->  Cloud SQL Overview -> Connect to this instance -> Open Cloud Shell.
+- Ejecutar en Cloud Shell
+```bash
+gcloud sql connect postgres-orders --user=postgres --quiet
+```
 
 🔍 **¿Qué hace?**
-- Abre una sesión `psql` para interactuar con la base de datos.
 - Usa la contraseña `supersecret!` para autenticarse como usuario `postgres`.
 
 
 
 ### 🟦 4. Crear la base de datos y activar pgAudit
-
+- Ejecutar en Cloud SQL
 ```sql
 CREATE DATABASE orders;
 \c orders;
@@ -279,7 +290,21 @@ ALTER DATABASE orders SET pgaudit.log = 'read,write';
 
 ### 🟦 5. Habilitar Audit Logging en Cloud Console
 
-  Path: Cloud Console -> Navigation menu -> click IAM & Admin > Audit Logs.
+  Path: Navigation menu > click IAM & Admin > Audit Logs.
+```bash
+In the Filter box under Data access audit logs configuration, type Cloud SQL, and select the entry in the drop-down list.
+
+Enable the checkbox for Cloud SQL on the left, and then enable the following checkboxes in the Info Panel on the right:
+
+Admin read
+Data read
+Data write
+Click Save in the Info Panel.
+
+Note: If you see a message at the top of the page that states you don't have permission to view inherited audit logs configuration data for one or more parent resources, you can safely ignore the message and continue to the next step.
+
+```
+
 
 🔍 **¿Qué hace?**
 - Activa los logs de auditoría para Cloud SQL en el proyecto.
@@ -288,7 +313,7 @@ ALTER DATABASE orders SET pgaudit.log = 'read,write';
 
 
 ### 🟦 6. Poblar la base de datos con datos de ejemplo
-
+- Ejecutar en Cloud Shell
 ```bash
 export SOURCE_BUCKET=gs://cloud-training/gsp920
 gsutil -m cp ${SOURCE_BUCKET}/create_orders_db.sql .
@@ -300,12 +325,12 @@ gsutil -m cp ${SOURCE_BUCKET}/DDL/users_data.csv .
 ```
 
 🔍 **¿Qué hace?**
-- Descarga los scripts y archivos CSV necesarios de el bucket para poblar la base de datos `orders`.
+- Descarga los scripts y archivos CSV necesarios del bucket para poblar la base de datos `orders`.
 
 
 
 ### 🟦 7. Ejecutar el script de carga de datos
-
+- Ejecutar en Cloud Shell
 ```bash
 export CLOUDSQL_INSTANCE=postgres-orders
 export POSTGRESQL_IP=$(gcloud sql instances describe $CLOUDSQL_INSTANCE --format="value(ipAddresses[0].ipAddress)")
@@ -321,7 +346,16 @@ psql "sslmode=disable user=postgres hostaddr=${POSTGRESQL_IP}" \
 
 ### 🟦 8. Configurar auditoría por rol
 
+- Ejecutar en Cloud Shell
+```bash
+gcloud sql connect postgres-orders --user=postgres --quiet
+```
+
+- Usa la contraseña `supersecret!` para autenticarse como usuario `postgres`.
+
+- Ejecutar en Cloud SQL
 ```sql
+\c orders
 CREATE ROLE auditor WITH NOLOGIN;
 ALTER DATABASE orders SET pgaudit.role = 'auditor';
 GRANT SELECT ON order_items TO auditor;
@@ -335,7 +369,7 @@ GRANT SELECT ON order_items TO auditor;
 
 
 ### 🟦 9. Ejecutar consultas de ejemplo
-
+- Ejecutar en Cloud SQL
 ```sql
 
 
