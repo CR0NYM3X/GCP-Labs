@@ -533,6 +533,10 @@ gcloud sql instances patch $CLOUDSQL_INSTANCE \
 📍 Ruta:  
 `Cloud Console → SQL → postgres-orders → Users → Add user account → Cloud IAM`
 
+```sql
+Example: student-03-881e224078ef@qwiklabs.net
+```
+
 🔍 **¿Qué hace?**
 
 - Agrega el usuario IAM como usuario válido en Cloud SQL.
