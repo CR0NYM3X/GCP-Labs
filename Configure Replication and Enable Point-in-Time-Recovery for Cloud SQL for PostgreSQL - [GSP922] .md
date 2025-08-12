@@ -96,6 +96,7 @@ SELECT COUNT(*) FROM distribution_centers;
 #### 📌 Abrir nueva pestaña en Cloud Shell y ejecutar:
 ```bash
 date --rfc-3339=seconds
+date -u --rfc-3339=ns | sed -r 's/ /T/; s/\.([0-9]{3}).*/\.\1Z/'
 ```
 
 **Ejemplo de salida:**
